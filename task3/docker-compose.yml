@@ -1,0 +1,35 @@
+version: "3.2"
+services:
+  rabbitmq:
+    image: 'rabbitmq:3-management'
+    container_name: 'rabbitmq'
+    ports:
+      # AMQP protocol port
+      - '5672:5672'
+      # HTTP management UI
+      - '15672:15672'
+    environment:
+      - RABBITMQ_DEFAULT_USER=user
+      - RABBITMQ_DEFAULT_PASS=password
+
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 512M
+
+  reader:
+    image: 'e2xen/rmq-reader:latest'
+    environment:
+      - AMQP_HOST=rabbitmq:5672
+      - AMQP_USER=user
+      - AMQP_PASSWORD=password
+      - AMQP_QUEUE=messages
+
+    deploy:
+      resources:
+        limits:
+          cpus: '0.50'
+          memory: 128M
+    depends_on:
+      - rabbitmq

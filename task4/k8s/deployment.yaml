@@ -1,0 +1,163 @@
+# rabbitmq
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: rabbitmq
+spec:
+  serviceName: rabbitmq-internal
+  selector:
+    matchLabels:
+      app: rabbitmq
+  template:
+    metadata:
+      labels:
+        app: rabbitmq
+    spec:
+      containers:
+        - name: rabbitmq
+          image: rabbitmq:3-management
+          ports:
+            - containerPort: 5672
+            - containerPort: 15672
+
+          env:
+            - name: "RABBITMQ_DEFAULT_USER"
+              value: user
+            - name: "RABBITMQ_DEFAULT_PASS"
+              value: password
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: rabbitmq-internal
+spec:
+  selector:
+    app: rabbitmq
+  ports:
+    - name: amqp
+      protocol: TCP
+      port: 5672
+      targetPort: 5672
+    - name: gui
+      protocol: TCP
+      port: 15672
+      targetPort: 15672
+
+# postgres
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: postgres
+spec:
+  serviceName: postgres-internal
+  selector:
+    matchLabels:
+      app: postgres
+  template:
+    metadata:
+      labels:
+        app: postgres
+    spec:
+      containers:
+        - name: postgres
+          image: postgres:14.4
+          env:
+            - name: POSTGRES_USER
+              value: postgres
+            - name: POSTGRES_PASSWORD
+              value: postgres
+            - name: POSTGRES_DB
+              value: postgres
+          ports:
+            - containerPort: 5432
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres-internal
+spec:
+  selector:
+    app: postgres
+  ports:
+    - name: tcp
+      protocol: TCP
+      port: 5432
+      targetPort: 5432
+
+# reader
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: reader
+  labels:
+    app: reader
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: reader
+  template:
+    metadata:
+      labels:
+        app: reader
+    spec:
+      containers:
+        - name: rmq-reader
+          image: e2xen/rmq-reader
+          imagePullPolicy: Always
+          env:
+            - name: "AMQP_HOST"
+              value: rabbitmq-internal:5672
+            - name: "AMQP_USER"
+              value: user
+            - name: "AMQP_PASSWORD"
+              value: password
+            - name: "AMQP_QUEUE_MESSAGES"
+              value: messages
+            - name: "AMQP_QUEUE_NOTIFICATIONS"
+              value: notifications
+
+            - name: "PG_HOST"
+              value: postgres-internal
+            - name: "PG_USER"
+              value: postgres
+            - name: "PG_PASSWORD"
+              value: postgres
+            - name: "PG_DATABASE"
+              value: postgres
+
+# generator
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: generator
+  labels:
+    app: generator
+spec:
+  selector:
+    matchLabels:
+      app: generator
+  template:
+    metadata:
+      labels:
+        app: generator
+    spec:
+      containers:
+        - name: rmq-generator
+          image: e2xen/rmq-generator
+          imagePullPolicy: Always
+          env:
+            - name: "AMQP_HOST"
+              value: rabbitmq-internal:5672
+            - name: "AMQP_USER"
+              value: user
+            - name: "AMQP_PASSWORD"
+              value: password
+            - name: "AMQP_QUEUE_MESSAGES"
+              value: messages
+            - name: "AMQP_QUEUE_NOTIFICATIONS"
+              value: notifications
